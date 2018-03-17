@@ -1,0 +1,96 @@
+<div class="entry"> 
+ <div class="copyright-area">
+  原文出处： 
+  <a ref="nofollow" target="_blank" href="http://xiagn825.github.io/2017/06/23/blog/">xiagn</a>
+ </div> 
+ <h2>1. 简介</h2> 
+ <p>本文介绍使用SpringMVC的后端服务如何通过配置来支持多种返回值类型（xml,json,html,excel）</p> 
+ <p>这里的代码使用的是springboot,下载地址：https://github.com/xiagn825/springboot-todolist/tree/springboot-ContentNegotiation</p> 
+ <h2>2. 基础概念</h2> 
+ <h3>2.1 HttpHeader中Content-Type和Accept设置的区别</h3> 
+ <p>Accept:接口要返回给客户端的数据格式</p> 
+ <pre class="brush: java; gutter: true">curl --header 'Accept:application/json' http://localhost:8080/todo</pre> 
+ <p>Content-Type:客户端发送给服务器端的数据格式</p> 
+ <pre class="brush: java; gutter: true">curl -X PUT --header 'Content-Type:application/json' -d '{"title":"周末日程","content":"睡觉"}' http://localhost:8080/todo</pre> 
+ <h3>2.2 SpringMVC生成输出的两种方式</h3> 
+ <p>1） 当服务端使用Restful的方式，只为客户端的ajax或其他服务端请求提供数据时，通常会使用@ResponseBody来标识你的返回，这时候Spring使用HttpMessageConverter来把返回的对象格式化成所需的格式。</p> 
+ <p>2） 当你需要提供表现层(比如：HTML)，这时候SpringMVC使用ViewResolver来将处理你的返回。</p> 
+ <p>有时候你的应用程序这两者都要提供</p> 
+ <h3>2.3 SpringMVC输出格式判定</h3> 
+ <p>很多时候为了支持多个系统或多个终端，你需要让相同的数据已不同的表现形式输出。</p> 
+ <p>SpringMVC使用ContentNegotationStrategy来判定用户请求希望得到什么格式的数据。</p> 
+ <p>ContentNegotationStrategy通过三种方式来识别用户想要返回什么样的数据</p> 
+ <ol> 
+  <li>通过请求URL后缀：http://myserver/myapp/accounts/list.html 返回html格式</li> 
+  <li>通过请求的参数：http://myserver/myapp/accounts/list?format=xls 该设置默认不开启，默认key是format。</li> 
+  <li>通过HTTP Header的Accept：Accept:application/xml 优先级由上至下</li> 
+ </ol> 
+ <p>请看如下配置</p> 
+ <pre class="brush: java; gutter: true">@Override
+public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+    configurer.favorPathExtension(false)
+            .favorParameter(true)
+            .parameterName("mediaType")
+            .defaultContentType(MediaType.APPLICATION_JSON)
+            .mediaType("xml", MediaType.APPLICATION_XML)
+            .mediaType("html", MediaType.TEXT_HTML)
+            .mediaType("json", MediaType.APPLICATION_JSON);
+}</pre> 
+ <p>在你工程的WebMvcConfig中加入以上配置，表示关闭URL后缀的规则，打开请求参数规则并设置请求参数为’mediaType’,默认的返回格式是json，还支持返回xml,html。</p> 
+ <p>这三个组件是用来处理返回不同格式输出的关键</p> 
+ <ul> 
+  <li>Request Mappings: 决定不同的请求到不同的方法并返回不同的格式.</li> 
+  <li>View Resolution: 根据类型返回合适的表示层.</li> 
+  <li>HttpMessageConverters: 将request中的参数转换成java对象，将java对象转换成相应的输出格式到response.</li> 
+ </ul> 
+ <h3>2.4 RequestMappings</h3> 
+ <p><strong>2.4.1 RequestMappingHandlerMapping</strong></p> 
+ <p>我们在spring中通常使用的就是RequestMappingHandlerMapping，根据RequestMappingInfo,细化匹配条件，整体的查找过程如下：</p> 
+ <p>AbstractHandlerMethodMapping实现接口getHandlerInternal</p> 
+ <p>1. 使用UrlPathHelper查找request对应的path</p> 
+ <p>2. 查找path对应的HandlerMethod</p> 
+ <p>2.1 从urlMap中直接等值匹配查找匹配条件RequestMappingInfo</p> 
+ <p>2.2 如果等值查找到匹配条件,将其添加到match条件中</p> 
+ <p>2.3 如果没有找到匹配条件,使用所有的handlerMethod的RequestMappingInfo进行匹配</p> 
+ <p>2.4 对匹配到的Match进行排序,取出最高优先级的Match,并核对是否是唯一的最高优先级</p> 
+ <p>2.5 对匹配到条件,没有匹配到条件的两种情况,分别进行封装</p> 
+ <p>3. 封装HandlerMethod,确保bean中存的是实例 　　 ContentNegotiationManager其中提供了针对miniType的match条件比较，使框架可以匹配到最合适的处理方法。</p> 
+ <h3>2.5 HttpMessageConverter</h3> 
+ <p><strong>2.5.1 The Default Message Converters</strong></p> 
+ <p>SpringMvc默认会加载下列HttpMessageConverters：</p> 
+ <pre class="brush: java; gutter: true">ByteArrayHttpMessageConverter – converts byte arrays
+StringHttpMessageConverter – converts Strings
+ResourceHttpMessageConverter – converts org.springframework.core.io.Resource for any type of octet stream
+SourceHttpMessageConverter – converts javax.xml.transform.Source
+FormHttpMessageConverter – converts form data to/from a MultiValueMap&lt;String, String&gt;.
+Jaxb2RootElementHttpMessageConverter – converts Java objects to/from XML (added only if JAXB2 is present on the classpath)
+MappingJackson2HttpMessageConverter – converts JSON (added only if Jackson 2 is present on the classpath)
+MappingJacksonHttpMessageConverter – converts JSON (added only if Jackson is present on the classpath)
+AtomFeedHttpMessageConverter – converts Atom feeds (added only if Rome is present on the classpath)
+RssChannelHttpMessageConverter – converts RSS feeds (added only if Rome is present on the classpath)</pre> 
+ <p>我们如果返回的是使用@ResponseBody来标识的，那么框架会使用HttpMessageConverter来处理返回值，默认的xmlCoverter不是特别好用，依赖返回实体对象上的@XmlRootElement注解，不是很方便所以引入辅助类库，并自定义MessageConverter这样可以直接将返回的对象处理成xml格式。</p> 
+ <p>Gradle import library</p> 
+ <pre class="brush: java; gutter: true">compile group: 'org.springframework', name: 'spring-oxm', version: '4.3.9.RELEASE'
+compile group: 'com.thoughtworks.xstream', name: 'xstream', version: '1.4.10'</pre> 
+ <p>configuration</p> 
+ <pre class="brush: java; gutter: true">@Override
+public void configureMessageConverters(List&lt;HttpMessageConverter&lt;?&gt;&gt; converters) {
+    converters.add(createXmlHttpMessageConverter());
+    super.configureMessageConverters(converters);
+}
+private HttpMessageConverter&lt;Object&gt; createXmlHttpMessageConverter() {
+    MarshallingHttpMessageConverter xmlConverter =
+            new MarshallingHttpMessageConverter();
+    XStreamMarshaller xstreamMarshaller = new XStreamMarshaller();
+    xmlConverter.setMarshaller(xstreamMarshaller);
+    xmlConverter.setUnmarshaller(xstreamMarshaller);
+    return xmlConverter;
+}</pre> 
+ <h3>2.6 View Resolution</h3> 
+ <p><strong>2.6.1 页面render（freemarker）</strong></p> 
+ <p>当需要返回页面时就需要由合适的viewResolver来绘制画面，这里采用freemarker作为页面引擎。</p> 
+ <p>Gradle import library</p> 
+ <pre class="brush: java; gutter: true">compile("org.springframework.boot:spring-boot-starter-freemarker")</pre> 
+ <!-- BEGIN #author-bio --> 
+ <!-- END #author-bio --> 
+</div>
