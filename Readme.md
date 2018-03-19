@@ -1,6 +1,6 @@
 # 使用Jsoup爬取ImportView的文章
 ### 写在前面
-	1. 本次爬取的是importview网站上的文章，因为感觉写得很好！
+	1. 本次爬取的是importnew网站上的文章，因为感觉写得很好！
 	2. 本次采用jsoup的开源框架官方教程：[link](http://www.open-open.com/jsoup).
 	3. 此方式和之前的不同，前面头条是通过api接口获取json，jsoup则是采用dom解析方式。
 	4. 而且jsoup选择器使用方法都和jQuery类似。
