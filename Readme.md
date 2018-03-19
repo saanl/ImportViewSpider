@@ -5,7 +5,7 @@
 	3. 此方式和之前的不同，前面头条是通过api接口获取json，jsoup则是采用dom解析方式。
 	4. 而且jsoup选择器使用方法都和jQuery类似。
 ### 实现思路
-	1. 获取importview的文章链接[link]http://www.importnew.com/all-posts/page/x.
+	1. 获取importnew的文章链接[link]http://www.importnew.com/all-posts/page/x.
 	2. 上面的x就是分页码，一共有131页，4000多篇文章。
 	3. 首先获取列表下的文章的题目和url储存到数据库。
 	4. 然后过滤自己想要的文章类型和方向下载。
